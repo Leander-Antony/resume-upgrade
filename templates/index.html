@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resume Review Bot</title>
+    <style>
+        body {
+            background-color: #222; /* Darker background */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Modern font */
+            color: #e0e0e0; /* Lighter text */
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Use min-height for full viewport */
+        }
+    
+        h1 {
+            text-align: center;
+            color: #00b0ff; /* Muted blue */
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+        }
+    
+        .form-container {
+            background-color: #333;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); /* More subtle shadow */
+            width: 450px; /* Adjust width */
+            text-align: center;
+        }
+    
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch; /* Stretch inputs to full width */
+        }
+    
+        label {
+            font-size: 1rem;
+            color: #99ccff; /* lighter blue label */
+            margin-bottom: 8px;
+            text-align: left; /* Align labels to the left */
+        }
+    
+        input[type="text"],
+        input[type="file"] {
+            padding: 12px;
+            margin-bottom: 15px;
+            background-color: #444;
+            border: none;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 1rem;
+            transition: background-color 0.3s ease;
+        }
+    
+        input[type="text"]:focus,
+        input[type="file"]:focus {
+            background-color: #555;
+            outline: none;
+        }
+    
+        button {
+            background-color: #00b0ff; /* Muted blue */
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+    
+        button:hover {
+            background-color: #0090e0; /* Darker blue on hover */
+            transform: translateY(-2px); /* Slight lift on hover */
+        }
+    
+        #feedbackPopup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #333;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
+            width: 80%; /* Adjust width */
+            max-width: 800px; /* max width for larger screens */
+            z-index: 1000;
+        }
+    
+        #feedbackPopup h2 {
+            margin-top: 0;
+            color: #00b0ff;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+    
+        #closePopup {
+            cursor: pointer;
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 24px;
+        }
+    
+        #closePopup:hover {
+            color: #ccc;
+        }
+    
+        #overlay {
+            position: fixed;
+            display: none;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 999;
+        }
+    
+        .additional-buttons {
+            margin-top: 30px;
+            text-align: center;
+        }
+    
+        .additional-buttons button {
+            margin: 10px;
+            padding: 12px 25px;
+            background-color: #00b0ff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+    
+        .additional-buttons button:hover {
+            background-color: #0090e0;
+            transform: translateY(-2px);
+        }
+    </style>
+  </head>
+  <body>
+    <div class="form-container">
+      <h1>Upload Your Resume for Review</h1>
+      <form id="resumeForm" enctype="multipart/form-data">
+        <label for="position">Position you are applying for:</label>
+        <input
+          type="text"
+          id="position"
+          name="position"
+          placeholder="Enter position..."
+          required
+        />
+
+        <label for="resume">Upload Resume:</label>
+        <input
+          type="file"
+          id="resume"
+          name="resume"
+          accept=".pdf,.png,.jpg,.jpeg,.docx"
+          required
+        />
+
+        <button type="submit">Submit</button>
+      </form>
+      <div id="additionalButtons" class="additional-buttons"></div>
+    </div>
+
+    <!-- Pop-up Div for displaying feedback -->
+    <div id="overlay"></div>
+    <div id="feedbackPopup">
+      <span id="closePopup">&times;</span>
+      <h2></h2>
+      <p id="feedbackContent"></p>
+    </div>
+
+    <div id="additionalButtons" class="additional-buttons"></div>
+
+    <script>
+      // Handle form submission
+      document
+        .getElementById("resumeForm")
+        .addEventListener("submit", function (event) {
+          event.preventDefault(); // Prevent traditional form submission
+
+          let formData = new FormData(this);
+
+          fetch("/upload", {
+            method: "POST",
+            body: formData,
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.error) {
+                showPopup("Error: " + data.error); // Display error in pop-up
+              } else {
+                const formattedFeedback = formatFeedback(data.feedback); // Format feedback
+                showPopup(formattedFeedback); // Display formatted feedback in pop-up
+              }
+            })
+            .catch((error) => {
+              showPopup("An error occurred: " + error);
+            });
+        });
+
+      // Function to format the feedback with bold and breaks
+      function formatFeedback(feedback) {
+        // Convert Markdown headers to HTML headings
+        feedback = feedback
+          .replace(/^#\s+(.+)$/gm, "<h1>$1</h1>")
+          .replace(/^##\s+(.+)$/gm, "<h2>$1</h2>")
+          .replace(/^###\s+(.+)$/gm, "<h3>$1</h3>")
+          .replace(/^####\s+(.+)$/gm, "<h4>$1</h4>")
+          .replace(/^#####\s+(.+)$/gm, "<h5>$1</h5>")
+          .replace(/^######\s+(.+)$/gm, "<h6>$1</h6>");
+
+        // Add <br> before every <b> tag
+        feedback = feedback.replace(/<b>/g, "<br><b>");
+
+        // Format bold text and lists
+        feedback = feedback
+          .replace(/\*\*Strengths:\*\*/g, "<b>Strengths:</b>")
+          .replace(
+            /\*\*Weaknesses and areas for improvement:\*\*/g,
+            "<b>Weaknesses and areas for improvement:</b>"
+          )
+          .replace(/\*\*Suggestions:\*\*/g, "<b>Suggestions:</b>")
+          .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
+          .replace(/\d+\.\s/g, "<br>");
+
+        return feedback;
+      }
+      // Function to display pop-up with feedback
+      function showPopup(content) {
+        document.getElementById("feedbackContent").innerHTML = content; // Insert HTML content
+        document.getElementById("feedbackPopup").style.display = "block";
+        document.getElementById("overlay").style.display = "block";
+      }
+
+      // Close the pop-up
+      document.getElementById("closePopup").onclick = function () {
+        document.getElementById("feedbackPopup").style.display = "none";
+        document.getElementById("overlay").style.display = "none";
+        addAdditionalButtons(); // Add the new buttons after closing
+      };
+
+      // Function to add "Create a Resume" and "Interview Prep" buttons
+      function addAdditionalButtons() {
+        const buttonsContainer = document.getElementById("additionalButtons");
+        buttonsContainer.innerHTML = `
+                <button id="createResume">Create a Resume</button>
+                <button id="interviewPrep">Interview Prep</button>
+            `;
+
+        // Add click events for the new buttons
+        document.getElementById("createResume").onclick = function () {
+          window.location.href = "/create-resume"; // Redirect to resume creation page
+        };
+
+        // Add the click event for interviewPrep here
+        document.getElementById("interviewPrep").onclick = function () {
+          fetch("/interview-prep")
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.error) {
+                showPopup(data.error);
+              } else {
+                const formattedPrep = formatFeedback(data.prep);
+                showPopup(formattedPrep, "Interview Prep");
+              }
+            })
+            .catch((error) => {
+              showPopup("An error occurred: " + error);
+            });
+        };
+      }
+
+      function showPopup(content, title = "Resume Feedback") {
+        document.getElementById("feedbackContent").innerHTML = content;
+        document.getElementById("feedbackPopup").style.display = "block";
+        document.getElementById("overlay").style.display = "block";
+        document
+          .getElementById("feedbackPopup")
+          .querySelector("h2").textContent = title;
+      }
+    </script>
+  </body>
+</html>
